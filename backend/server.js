@@ -65,21 +65,39 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('✅ MongoDB Connected');
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) {
+    return;
+  }
+  return mongoose.connect(process.env.MONGODB_URI);
+};
+
+// For serverless (Vercel), connect on each request
+// For local dev, connect once and listen
+if (process.env.VERCEL) {
+  // Running on Vercel - export app for serverless
+  connectDB();
+  module.exports = app;
+} else {
+  // Running locally - connect and listen
+  connectDB()
+    .then(() => {
+      console.log('✅ MongoDB Connected');
+      const PORT = process.env.PORT || 5000;
+      app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('❌ MongoDB connection error:', err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
     process.exit(1);
   });
+}
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  process.exit(1);
-});
+module.exports = app;
